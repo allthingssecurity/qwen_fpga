@@ -1,0 +1,25 @@
+# envs and caches
+.venv/
+__pycache__/
+*.pyc
+
+# never commit keys or large binaries
+*.pem
+*.bin
+*.npz
+*.xclbin
+*.tar
+
+# big third-party clone and build trees
+third_party/
+sim/build/
+hls/build/
+artifacts/dramsim3_out/
+artifacts/tb_deltanet
+artifacts/tb_decode
+artifacts/run_hls
+
+# keep these generated artifacts in the repo
+!artifacts/generations.md
+!artifacts/qwen35_int8.manifest.json
+!artifacts/vitis_reports/

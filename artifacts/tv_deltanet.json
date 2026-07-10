@@ -1,0 +1,80 @@
+{
+ "H": 16,
+ "K": 128,
+ "V": 128,
+ "total_bytes": 2130048,
+ "tensors": [
+  {
+   "name": "q",
+   "shape": [
+    16,
+    128
+   ],
+   "offset": 0,
+   "nbytes": 8192
+  },
+  {
+   "name": "k",
+   "shape": [
+    16,
+    128
+   ],
+   "offset": 8192,
+   "nbytes": 8192
+  },
+  {
+   "name": "v",
+   "shape": [
+    16,
+    128
+   ],
+   "offset": 16384,
+   "nbytes": 8192
+  },
+  {
+   "name": "g",
+   "shape": [
+    16
+   ],
+   "offset": 24576,
+   "nbytes": 64
+  },
+  {
+   "name": "beta",
+   "shape": [
+    16
+   ],
+   "offset": 24640,
+   "nbytes": 64
+  },
+  {
+   "name": "S_in",
+   "shape": [
+    16,
+    128,
+    128
+   ],
+   "offset": 24704,
+   "nbytes": 1048576
+  },
+  {
+   "name": "o_core",
+   "shape": [
+    16,
+    128
+   ],
+   "offset": 1073280,
+   "nbytes": 8192
+  },
+  {
+   "name": "S_out",
+   "shape": [
+    16,
+    128,
+    128
+   ],
+   "offset": 1081472,
+   "nbytes": 1048576
+  }
+ ]
+}

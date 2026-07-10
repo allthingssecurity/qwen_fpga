@@ -1,0 +1,11 @@
+Measured on real AWS f2.6xlarge silicon (VU47P), cl_mem_perf, 32 HBM channels at 450 MHz.
+AGFI: agfi-0086d86f94c9ba1f5
+
+WR Bandwidth    = 433.69 GBytes/s
+RD Bandwidth    = 426.14 GBytes/s
+RD Latency      = 268 ns
+WR Latency      = 164 ns
+TEST PASSED
+
+Device peak: 460 GB/s. Read achieves 92.6 percent of peak.
+Qwen3.5-0.8B decode: 426.14 GB/s / 0.7586 GB per token = 562 tokens/sec.

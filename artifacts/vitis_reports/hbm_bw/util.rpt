@@ -1,0 +1,148 @@
+INFO: Setting up environment variables
+INFO: VITIS_TOOL_VER = 2025.2
+Distro: Ubuntu
+INFO: Checking instance internet connection
+HTTP/2 200 
+content-type: text/html; charset=ISO-8859-1
+content-security-policy-report-only: object-src 'none';base-uri 'self';script-src 'nonce-8fpap2Zptkdxx7l5vdTPJQ' 'strict-dynamic' 'report-sample' 'unsafe-eval' 'unsafe-inline' https: http:;report-uri https://csp.withgoogle.com/csp/gws/other-hp
+accept-ch: Sec-CH-Prefers-Color-Scheme
+p3p: CP="This is not a P3P policy! See g.co/p3phelp for more info."
+date: Fri, 10 Jul 2026 08:00:19 GMT
+server: gws
+x-xss-protection: 0
+x-frame-options: SAMEORIGIN
+expires: Fri, 10 Jul 2026 08:00:19 GMT
+cache-control: private
+set-cookie: __Secure-STRP=ANmZwa1lUeXr6FGK6LPu0RykytZvrJySP1QGaI1nNav7T4UPshVb8EWN3TzgVL0fjtgkiWDTR6c93z-zl0_V3nHT813X9f5E7WoR; expires=Fri, 10-Jul-2026 08:05:19 GMT; path=/; domain=.google.com; Secure; SameSite=strict
+set-cookie: AEC=AdJVEaurg_b44ymcomcJQ3wL7yv_4jB_esOhY7N4Mr-hTLcUBYWH9-mrfQ; expires=Wed, 06-Jan-2027 08:00:19 GMT; path=/; domain=.google.com; Secure; HttpOnly; SameSite=lax
+set-cookie: NID=533=YmP1xgafu0ww42bJ7NeNILsGAdh6Me5OvofCa3ZVkc44yzij96JNDxDFk3rrjr4a8KpUoaD1_Ucb60NdkapSQIlquXVSp7MiJIfRC0weqf_bsew9IMOtPaPRd-TqqkZKLqEukCpO0uAvU02Rp2U3-2VS8yJxjKdlFPx62esAYYL0Ze42QPsgo8fhaEwcSiOFldmL9iGfbeyHDH8Sa9qk0g; expires=Sat, 09-Jan-2027 08:00:19 GMT; path=/; domain=.google.com; HttpOnly
+alt-svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+
+INFO: Active internet connection detected!
+INFO: Checking for ICD installation
+INFO: Found libxilinxopencl.so
+INFO: Sourcing sdk_setup.sh
+INFO: Setting up environment variables
+Entering /home/ubuntu/aws-fpga/sdk/userspace/utils
+rm -f *.o *.a ../lib/libutils.a
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../include -I/usr/include   -c -o io.o io.c
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../include -I/usr/include   -c -o log.o log.c
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../include -I/usr/include   -c -o logger-kmsg.o logger-kmsg.c
+mkdir -p ../lib
+ar rcs ../lib/libutils.a io.o log.o logger-kmsg.o
+Entering /home/ubuntu/aws-fpga/sdk/userspace/fpga_libs/fpga_pci
+rm -f *.o ../../lib/libfpga_pci.a
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_pci.o fpga_pci.c
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_pci_sysfs.o fpga_pci_sysfs.c
+mkdir -p ../../lib
+ar rcs ../../lib/libfpga_pci.a fpga_pci.o fpga_pci_sysfs.o
+Entering /home/ubuntu/aws-fpga/sdk/userspace/fpga_libs/fpga_dma
+rm -f *.o ../../lib/libfpga_dma.a
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_dma_mem.o fpga_dma_mem.c
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_dma_utils.o fpga_dma_utils.c
+mkdir -p ../../lib
+ar rcs ../../lib/libfpga_dma.a fpga_dma_mem.o fpga_dma_utils.o
+Entering /home/ubuntu/aws-fpga/sdk/userspace/fpga_libs/fpga_clkgen
+rm -f *.o ../../lib/libfpga_clkgen.a
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_clkgen_mmcm.o fpga_clkgen_mmcm.c
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_clkgen_utils.o fpga_clkgen_utils.c
+mkdir -p ../../lib
+ar rcs ../../lib/libfpga_clkgen.a fpga_clkgen_mmcm.o fpga_clkgen_utils.o
+Entering /home/ubuntu/aws-fpga/sdk/userspace/fpga_libs/fpga_mgmt
+rm -f *.o ../../lib/libfpga_mgmt.a ../../lib/so/libfpga_mgmt.so.1.0.0
+cc  -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_hal_mbox.o fpga_hal_mbox.c
+cc  -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_mgmt.o fpga_mgmt.c
+cc  -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -std=gnu99 -fPIC -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I. -I../../include -I/usr/include   -c -o fpga_mgmt_cmd.o fpga_mgmt_cmd.c
+mkdir -p ../../lib
+for library in ../../lib/libfpga_pci.a ../../lib/libutils.a ../../lib/libfpga_dma.a ../../lib/libfpga_clkgen.a; do ar -x $library; done
+ar rcs ../../lib/libfpga_mgmt.a *.o
+mkdir -p ../../lib/so
+cc -o ../../lib/so/libfpga_mgmt.so.1.0.0 -shared fpga_hal_mbox.o fpga_mgmt.o fpga_mgmt_cmd.o -Wl,-soname,libfpga_mgmt.so.1 -Wl,--whole-archive ../../lib/libfpga_pci.a ../../lib/libutils.a ../../lib/libfpga_dma.a ../../lib/libfpga_clkgen.a -Wl,--no-whole-archive -lrt -lpthread
+ln -sf libfpga_mgmt.so.1.0.0 ../../lib/so/libfpga_mgmt.so
+Entering /home/ubuntu/aws-fpga/sdk/userspace/fpga_mgmt_tools/src
+rm -f *.o *.a fpga-local-cmd static-fpga-local-cmd
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g  -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.   -c -o fpga_local_cmd.o fpga_local_cmd.c
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g  -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.   -c -o fpga_local_cmd_parse.o fpga_local_cmd_parse.c
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g  -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.   -c -o virtual_jtag_pcie.o virtual_jtag_pcie.c
+cc -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g  -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.   -c -o virtual_jtag_server.o virtual_jtag_server.c
+cc -o fpga-local-cmd fpga_local_cmd.o fpga_local_cmd_parse.o virtual_jtag_pcie.o virtual_jtag_server.o -L../../lib/so -lfpga_mgmt
+cc -o static-fpga-local-cmd fpga_local_cmd.o fpga_local_cmd_parse.o virtual_jtag_pcie.o virtual_jtag_server.o -L../../lib -lfpga_mgmt -lrt -lpthread
+Entering /home/ubuntu/aws-fpga/sdk/userspace/fpga_mgmt_examples/src
+rm -f *.o *.a clear_single_fpga clear_multiple_fpga load_single_fpga load_multiple_fpga prefetch_multiple_afi static_clear_single_fpga static_clear_multiple_fpga static_load_single_fpga static_load_multiple_fpga static_prefetch_multiple_afi
+cc -o clear_single_fpga clear_single_fpga.c -L../../lib/so -lfpga_mgmt -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o clear_multiple_fpga clear_multiple_fpga.c -L../../lib/so -lfpga_mgmt -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o load_single_fpga load_single_fpga.c -L../../lib/so -lfpga_mgmt -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o load_multiple_fpga load_multiple_fpga.c -L../../lib/so -lfpga_mgmt -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o prefetch_multiple_afi prefetch_multiple_afi.c -L../../lib/so -lfpga_mgmt -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o static_clear_single_fpga clear_single_fpga.c -L../../lib -lfpga_mgmt -lrt -lpthread -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o static_clear_multiple_fpga clear_multiple_fpga.c -L../../lib -lfpga_mgmt -lrt -lpthread -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o static_load_single_fpga load_single_fpga.c -L../../lib -lfpga_mgmt -lrt -lpthread -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o static_load_multiple_fpga load_multiple_fpga.c -L../../lib -lfpga_mgmt -lrt -lpthread -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+cc -o static_prefetch_multiple_afi prefetch_multiple_afi.c -L../../lib -lfpga_mgmt -lrt -lpthread -DCONFIG_LOGLEVEL=0 -DFPGA_PCI_BARS_MAX=64 -DCLI_VERSION='"2.3.3"' -g -Wall -Werror -W -Wno-parentheses -Wstrict-prototypes -Wmissing-prototypes -I../../include/hal -I../../include -I../. -I.
+Build complete.
+
+Root privileges are required to install. You may be asked for your password...
+Executing as root...
+
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+AWS FPGA: Copying Amazon FPGA Image (AFI) Management Tools to /usr/local/bin
+AWS FPGA: Installing shared library to /usr/local/lib
+	libfpga_mgmt.so.1 (libc6,x86-64) => /usr/local/lib/libfpga_mgmt.so.1
+AWS FPGA: Done with Amazon FPGA Image (AFI) Management Tools install.
+Done with SDK install.
+Collecting setuptools
+  Downloading setuptools-83.0.0-py3-none-any.whl.metadata (6.6 kB)
+Collecting Cython
+  Downloading cython-3.2.8-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (4.2 kB)
+Downloading setuptools-83.0.0-py3-none-any.whl (1.0 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.0/1.0 MB 24.8 MB/s eta 0:00:00
+Downloading cython-3.2.8-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (3.4 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3.4/3.4 MB 46.4 MB/s eta 0:00:00
+Installing collected packages: setuptools, Cython
+Successfully installed Cython-3.2.8 setuptools-83.0.0
+Compiling fpga_utils.pyx because it changed.
+Compiling fpga_mgmt_wrapper.pyx because it changed.
+Compiling fpga_pci_wrapper.pyx because it changed.
+Compiling fpga_clkgen_wrapper.pyx because it changed.
+[1/4] Cythonizing fpga_clkgen_wrapper.pyx
+[2/4] Cythonizing fpga_mgmt_wrapper.pyx
+[3/4] Cythonizing fpga_pci_wrapper.pyx
+[4/4] Cythonizing fpga_utils.pyx
+running build_ext
+building 'fpga_utils' extension
+creating build/temp.linux-x86_64-cpython-312
+x86_64-linux-gnu-gcc -fno-strict-overflow -Wsign-compare -DNDEBUG -g -O2 -Wall -fPIC -I/home/ubuntu/aws-fpga/sdk/userspace/include -I/home/ubuntu/aws-fpga/sdk/userspace/cython_bindings/venv/include -I/usr/include/python3.12 -c fpga_utils.c -o build/temp.linux-x86_64-cpython-312/fpga_utils.o -Wno-address-of-packed-member
+creating build/lib.linux-x86_64-cpython-312
+x86_64-linux-gnu-gcc -shared -Wl,-O1 -Wl,-Bsymbolic-functions -Wl,-Bsymbolic-functions -Wl,-z,relro -g -fwrapv -O2 build/temp.linux-x86_64-cpython-312/fpga_utils.o -L/home/ubuntu/aws-fpga/sdk/userspace/lib/so -L/usr/lib/x86_64-linux-gnu -lfpga_mgmt -o build/lib.linux-x86_64-cpython-312/fpga_utils.cpython-312-x86_64-linux-gnu.so
+building 'fpga_mgmt_wrapper' extension
+x86_64-linux-gnu-gcc -fno-strict-overflow -Wsign-compare -DNDEBUG -g -O2 -Wall -fPIC -I/home/ubuntu/aws-fpga/sdk/userspace/include -I/home/ubuntu/aws-fpga/sdk/userspace/cython_bindings/venv/include -I/usr/include/python3.12 -c fpga_mgmt_wrapper.c -o build/temp.linux-x86_64-cpython-312/fpga_mgmt_wrapper.o -Wno-address-of-packed-member
+x86_64-linux-gnu-gcc -shared -Wl,-O1 -Wl,-Bsymbolic-functions -Wl,-Bsymbolic-functions -Wl,-z,relro -g -fwrapv -O2 build/temp.linux-x86_64-cpython-312/fpga_mgmt_wrapper.o -L/home/ubuntu/aws-fpga/sdk/userspace/lib/so -L/home/ubuntu/aws-fpga/sdk/userspace/lib -L/usr/lib/x86_64-linux-gnu -lfpga_mgmt -o build/lib.linux-x86_64-cpython-312/fpga_mgmt_wrapper.cpython-312-x86_64-linux-gnu.so
+building 'fpga_pci_wrapper' extension
+x86_64-linux-gnu-gcc -fno-strict-overflow -Wsign-compare -DNDEBUG -g -O2 -Wall -fPIC -I/home/ubuntu/aws-fpga/sdk/userspace/include -I/home/ubuntu/aws-fpga/sdk/userspace/cython_bindings/venv/include -I/usr/include/python3.12 -c fpga_pci_wrapper.c -o build/temp.linux-x86_64-cpython-312/fpga_pci_wrapper.o -Wno-address-of-packed-member
+x86_64-linux-gnu-gcc -shared -Wl,-O1 -Wl,-Bsymbolic-functions -Wl,-Bsymbolic-functions -Wl,-z,relro -g -fwrapv -O2 build/temp.linux-x86_64-cpython-312/fpga_pci_wrapper.o /home/ubuntu/aws-fpga/sdk/userspace/lib/libfpga_pci.a -L/home/ubuntu/aws-fpga/sdk/userspace/lib/so -L/home/ubuntu/aws-fpga/sdk/userspace/lib -L/usr/lib/x86_64-linux-gnu -lfpga_mgmt -o build/lib.linux-x86_64-cpython-312/fpga_pci_wrapper.cpython-312-x86_64-linux-gnu.so
+building 'fpga_clkgen_wrapper' extension
+x86_64-linux-gnu-gcc -fno-strict-overflow -Wsign-compare -DNDEBUG -g -O2 -Wall -fPIC -I/home/ubuntu/aws-fpga/sdk/userspace/include -I/home/ubuntu/aws-fpga/sdk/userspace/cython_bindings/venv/include -I/usr/include/python3.12 -c fpga_clkgen_wrapper.c -o build/temp.linux-x86_64-cpython-312/fpga_clkgen_wrapper.o -Wno-address-of-packed-member
+x86_64-linux-gnu-gcc -shared -Wl,-O1 -Wl,-Bsymbolic-functions -Wl,-Bsymbolic-functions -Wl,-z,relro -g -fwrapv -O2 build/temp.linux-x86_64-cpython-312/fpga_clkgen_wrapper.o /home/ubuntu/aws-fpga/sdk/userspace/lib/libfpga_clkgen.a -L/home/ubuntu/aws-fpga/sdk/userspace/lib/so -L/usr/lib/x86_64-linux-gnu -lfpga_mgmt -o build/lib.linux-x86_64-cpython-312/fpga_clkgen_wrapper.cpython-312-x86_64-linux-gnu.so
+copying build/lib.linux-x86_64-cpython-312/fpga_utils.cpython-312-x86_64-linux-gnu.so -> 
+copying build/lib.linux-x86_64-cpython-312/fpga_mgmt_wrapper.cpython-312-x86_64-linux-gnu.so -> 
+copying build/lib.linux-x86_64-cpython-312/fpga_pci_wrapper.cpython-312-x86_64-linux-gnu.so -> 
+copying build/lib.linux-x86_64-cpython-312/fpga_clkgen_wrapper.cpython-312-x86_64-linux-gnu.so -> 
+Cython bindings setup complete!
+INFO: sdk_setup.sh PASSED
+Cloning into 'Vitis_Accel_Examples'...
+INFO: ###########################################################################
+INFO: #                       No XRT install detected!                          #
+INFO: #     To install the XRT for Vitis runtime support, run 'install_xrt'     #
+INFO: ###########################################################################
+INFO: The default AWS Platform has been set to: "AWS_PLATFORM=AWS_PLATFORM_202420_2" 
+
+INFO: #-------------------------------------------------------------------------------#
+INFO: How to run Hardware Emulation on an example
+INFO: cd vitis/examples/vitis_examples/hello_world
+INFO: hw_file_check
+INFO: #----------------------------- Emulation: Build --------------------------------#
+INFO: make build TARGET=hw_emu PLATFORM=$SHELL_EMU_VERSION
+INFO: #--------------------------- Emulation: Simulation -----------------------------#
+INFO: make run TARGET=hw_emu PLATFORM=$SHELL_EMU_VERSION
+INFO: #-------------------------------------------------------------------------------#
+INFO: Vitis Setup PASSED
