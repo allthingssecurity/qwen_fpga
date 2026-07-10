@@ -1,5 +1,10 @@
 # Silicon validation on AWS F2
 
+Note up front: Qwen never ran on the FPGA in this work. What ran on the chip was
+a memory bandwidth benchmark. The model itself has not been built into hardware.
+This document records proving the FPGA delivery path and measuring HBM bandwidth,
+not running the model.
+
 This is the record of getting a design onto a real F2 FPGA end to end, and what
 it took to get there. The goal of the whole project is to run Qwen3.5-0.8B decode
 on the chip. Before writing the full model in hardware, we proved every step of

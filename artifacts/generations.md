@@ -1,6 +1,6 @@
 # Generations
 
-Every prompt below was run through the verified Qwen3.5-0.8B decode using int8 weights and int8 activations, the same arithmetic the FPGA datapath uses. The numpy golden model and the HLS decode agree bit for bit, so these are the exact tokens the hardware path produces. Timings are from the numpy reference on CPU and are for correctness, not speed. The real hardware token rate comes from the measured HBM bandwidth.
+These were produced by the numpy model on a CPU. They were not produced by the FPGA. The chip has never run Qwen and has never generated a token. Every prompt below was run through the software model using int8 weights and int8 activations, the same arithmetic a hardware datapath would use, and the numpy model and the HLS decode agree bit for bit, so the text is correct. The timings, around 30 to 35 tokens per second, are the CPU reference speed and say nothing about hardware. There is no on chip token rate in this project, because the model has not been built into hardware.
 
 
 ## What is the capital of France?

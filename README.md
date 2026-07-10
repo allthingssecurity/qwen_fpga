@@ -1,11 +1,16 @@
 # Qwen3.5-0.8B on AWS FPGA (F2)
 
-Running batch-1 decode of `Qwen/Qwen3.5-0.8B` (text only) on an AWS F2 instance,
-which carries an AMD Virtex UltraScale+ HBM part (VU47P) with 16 GiB of HBM.
-The work covers a bit-exact software model, an HLS hardware datapath verified
-against it, a cycle-accurate HBM bandwidth study, a real Vitis synthesis pass on
-the actual chip, and a full end to end validation of the FPGA delivery path on
-real silicon.
+Work toward running batch-1 decode of `Qwen/Qwen3.5-0.8B` (text only) on an AWS
+F2 instance, which carries an AMD Virtex UltraScale+ HBM part (VU47P) with 16 GiB
+of HBM.
+
+**Status in one line: Qwen does not yet run on the FPGA.** What exists is a
+bit-exact software model, an HLS hardware datapath verified against it, a
+bandwidth study, a real Vitis synthesis pass on the chip, a full validation of
+the FPGA build and load path on real silicon, and a measured HBM bandwidth of
+426 GB/s on the real chip. The model itself running on hardware, and any token
+rate measured on the chip, is the next build and has not been done. Every number
+below is labeled with where it came from so nothing reads as more than it is.
 
 ## The core idea
 
@@ -141,34 +146,42 @@ all confirmed. Details in `docs/silicon_validation.md`.
 
 ### 7. Measured HBM bandwidth on real silicon
 
-The AWS HBM bandwidth benchmark `cl_mem_perf` was built through the HDK flow,
-turned into an AFI, and run on a real f2.6xlarge. It closed timing at 450 MHz on
-all 32 HBM channels. Measured on the chip:
+Read this carefully, because it is easy to overclaim. What ran on the FPGA is a
+memory bandwidth benchmark, not Qwen. No prompt has been run on the chip. The
+AWS example `cl_mem_perf` was built through the HDK flow, turned into an AFI, and
+run on a real f2.6xlarge, where it closed timing at 450 MHz on all 32 HBM
+channels and measured:
 
 ```
-read bandwidth   426.14 GB/s
+read bandwidth   426.14 GB/s   (92.6 percent of the 460 GB/s device peak)
 write bandwidth  433.69 GB/s
 read latency     268 ns
 ```
 
-Read is 92.6 percent of the 460 GB/s device peak. Decode reads the weights, so
-the read number is the one that sets the token rate:
+This is a real, measured number, but it is the memory speed of the chip, not a
+Qwen token rate.
 
-```
-426.14 GB/s / 0.7586 GB per token = 562 tokens per second
-```
+What it validates: the DRAMsim3 model in section 4 predicted 424 GB/s of usable
+read bandwidth for this access pattern. The chip measured 426 GB/s. So the
+bandwidth model was accurate.
 
-The DRAMsim3 model in section 4 predicted 424 GB/s and 559 tokens per second.
-The real chip measured 426 GB/s and 562 tokens per second. The model was right,
-now confirmed on silicon. Full output is in
-`artifacts/vitis_reports/f2_hbm_bandwidth.txt`.
+What it does not prove: an actual Qwen token rate. Single token decode is limited
+by memory bandwidth, so the ceiling that 426 GB/s implies is
+`426.14 / 0.7586 = 562 tokens per second`. That is a projection from the measured
+bandwidth, not a measurement of Qwen running. Qwen has not been built into
+hardware yet. To get a measured token rate the decode datapath has to be written
+in RTL and run on the chip, which is the next build (see section 9). Full
+benchmark output is in `artifacts/vitis_reports/f2_hbm_bandwidth.txt`.
 
 ### 8. Generations
 
 Full prompts, complete answers, token counts, and timings are in
-`artifacts/generations.md`. The text comes from the verified int8 model path, the
-same arithmetic the hardware datapath uses. The token rate the hardware sustains
-comes from the measured HBM bandwidth above, not from these CPU timings.
+`artifacts/generations.md`. These were produced by the numpy model on a CPU, not
+by the FPGA. The chip has not generated any tokens. The per prompt timings in
+that file, around 30 to 35 tokens per second, are the CPU reference speed and
+mean nothing about hardware. They are there only to show the model produces
+correct, coherent text using the same int8 arithmetic the hardware datapath
+would use.
 
 ## Reproduce
 
@@ -195,7 +208,24 @@ The FPGA build and silicon steps are in `docs/silicon_validation.md` and
 
 ## Status and what is next
 
-Done: the software model, the HLS datapath, the bandwidth study, a real Vitis
-synthesis pass, and full validation of the silicon delivery path on real F2
-hardware. Next is the actual model on chip, the Qwen decode datapath written in
-RTL on top of the proven HBM template, so the FPGA generates tokens directly.
+To be direct about what this project is and is not:
+
+Done:
+- a software model of Qwen3.5-0.8B decode, checked against PyTorch
+- the decode datapath written in HLS C++ and checked against that model
+- a bandwidth study, later confirmed by a real bandwidth measurement on the chip
+- a real Vitis synthesis pass mapping kernels to the actual VU47P
+- proof that the FPGA build, image, load, and host path all work on real silicon
+- a measured HBM read bandwidth of 426 GB/s on a real f2.6xlarge
+
+Not done:
+- Qwen has never run on the FPGA
+- no prompt has been sent to the chip, and no token has been generated by the chip
+- the 562 tokens per second figure is arithmetic from the measured bandwidth, not
+  a measurement of the model running
+
+Next, and this is the actual model on chip: write the Qwen decode datapath in RTL,
+build it into a custom logic block on top of the HBM template that is already
+proven to reach silicon, load it on an f2, send a prompt over PCIe, and read the
+generated tokens and the measured on chip token rate back. That build has not been
+started. Until it is, the token rate here is a projection, not a hardware result.
