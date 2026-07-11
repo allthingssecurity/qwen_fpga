@@ -5,10 +5,12 @@
 # Each target verilates one module plus its C++ testbench and runs it from the
 # repo root so the artifacts/tv_*.bin paths resolve.
 
+VROOT := $(shell verilator --getenv VERILATOR_ROOT)
+
 VFLAGS := --cc --exe --build -Wno-WIDTH -Wno-UNOPTFLAT -I.
 
-.PHONY: gemv matvec deltanet rmsnorm swiglu conv softmax rope gate l2norm gnorm mixer mixer16 all clean
-all: gemv matvec deltanet rmsnorm swiglu conv softmax rope gate l2norm gnorm mixer mixer16
+.PHONY: gemv matvec deltanet rmsnorm swiglu conv softmax rope gate l2norm gnorm mixer mixer16 front all clean
+all: gemv matvec deltanet rmsnorm swiglu conv softmax rope gate l2norm gnorm mixer mixer16 front
 
 gemv:
 	cd .. && verilator $(VFLAGS) -Irtl rtl/gemv_i8.sv rtl/tb/sim_gemv.cpp \
@@ -76,6 +78,15 @@ mixer16:
 		rtl/gate_math.sv rtl/deltanet_head.sv rtl/gated_norm.sv \
 		rtl/tb/sim_mixer16.cpp --top-module deltanet_mixer_core -o sim_mixer16 >/dev/null 2>&1
 	cd .. && ./obj_dir/sim_mixer16
+
+# multi-module co-sim (matvec + conv), linked by hand
+front:
+	cd .. && rm -rf obj_dir
+	cd .. && verilator --cc -Wno-WIDTH -Wno-UNOPTFLAT -Wno-BLKSEQ -Irtl rtl/matvec_i8.sv rtl/gemv_i8.sv rtl/dequant.sv --prefix Vmv --Mdir obj_dir --top-module matvec_i8 >/dev/null 2>&1
+	cd .. && verilator --cc -Wno-WIDTH -Wno-UNOPTFLAT -Wno-BLKSEQ -Irtl rtl/conv1d_tap.sv --prefix Vcv --Mdir obj_dir --top-module conv1d_tap >/dev/null 2>&1
+	cd .. && make -C obj_dir -f Vmv.mk >/dev/null 2>&1 && make -C obj_dir -f Vcv.mk >/dev/null 2>&1
+	cd .. && clang++ -O2 -std=c++17 -Iobj_dir -I$(VROOT)/include -I$(VROOT)/include/vltstd rtl/tb/sim_front.cpp $(VROOT)/include/verilated.cpp $(VROOT)/include/verilated_threads.cpp obj_dir/Vmv__ALL.a obj_dir/Vcv__ALL.a -pthread -o obj_dir/sim_front >/dev/null 2>&1
+	cd .. && ./obj_dir/sim_front
 
 clean:
 	rm -rf ../obj_dir
