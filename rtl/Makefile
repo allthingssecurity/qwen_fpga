@@ -7,8 +7,8 @@
 
 VFLAGS := --cc --exe --build -Wno-WIDTH -Wno-UNOPTFLAT -I.
 
-.PHONY: gemv matvec deltanet all clean
-all: gemv matvec deltanet
+.PHONY: gemv matvec deltanet rmsnorm all clean
+all: gemv matvec deltanet rmsnorm
 
 gemv:
 	cd .. && verilator $(VFLAGS) -Irtl rtl/gemv_i8.sv rtl/tb/sim_gemv.cpp \
@@ -24,6 +24,11 @@ deltanet:
 	cd .. && verilator $(VFLAGS) -Wno-BLKSEQ -Irtl rtl/deltanet_head.sv \
 		rtl/tb/sim_deltanet.cpp --top-module deltanet_head -o sim_deltanet >/dev/null 2>&1
 	cd .. && ./obj_dir/sim_deltanet
+
+rmsnorm:
+	cd .. && verilator $(VFLAGS) -Wno-BLKSEQ -Irtl rtl/rmsnorm.sv \
+		rtl/tb/sim_rmsnorm.cpp --top-module rmsnorm -o sim_rmsnorm >/dev/null 2>&1
+	cd .. && ./obj_dir/sim_rmsnorm
 
 clean:
 	rm -rf ../obj_dir
