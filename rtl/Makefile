@@ -7,8 +7,8 @@
 
 VFLAGS := --cc --exe --build -Wno-WIDTH -Wno-UNOPTFLAT -I.
 
-.PHONY: gemv matvec deltanet rmsnorm swiglu all clean
-all: gemv matvec deltanet rmsnorm swiglu
+.PHONY: gemv matvec deltanet rmsnorm swiglu conv all clean
+all: gemv matvec deltanet rmsnorm swiglu conv
 
 gemv:
 	cd .. && verilator $(VFLAGS) -Irtl rtl/gemv_i8.sv rtl/tb/sim_gemv.cpp \
@@ -34,6 +34,11 @@ swiglu:
 	cd .. && verilator $(VFLAGS) -Wno-BLKSEQ -Irtl rtl/swiglu.sv \
 		rtl/tb/sim_swiglu.cpp --top-module swiglu -o sim_swiglu >/dev/null 2>&1
 	cd .. && ./obj_dir/sim_swiglu
+
+conv:
+	cd .. && verilator $(VFLAGS) -Wno-BLKSEQ -Irtl rtl/conv1d_tap.sv \
+		rtl/tb/sim_conv.cpp --top-module conv1d_tap -o sim_conv >/dev/null 2>&1
+	cd .. && ./obj_dir/sim_conv
 
 clean:
 	rm -rf ../obj_dir
