@@ -194,9 +194,14 @@ Done and proven so far:
 - `rtl/gemv_i8.sv`, the int8 GEMV weight streamer, the block that does the matrix
   work in every layer. Verified bit-exact against the model (`make -C rtl gemv`):
   512 output rows, all matching numpy's integer result with no tolerance.
+- `rtl/dequant.sv` and `rtl/matvec_i8.sv`, the fixed-point dequant and the
+  complete int8 matrix-vector primitive (GEMV plus dequant) that every layer
+  projection is built from. Verified against the model's fp32 output
+  (`make -C rtl matvec`): 512 rows, worst error 1 LSB in Q14, about 6e-5. Uses
+  only integer multiply and shift, no floating-point unit.
 
 Still to write and verify, then integrate:
-- RMSNorm (two conventions) and the dequant stage
+- RMSNorm (two conventions), using a fixed-point reciprocal-sqrt
 - the causal conv and the Gated DeltaNet recurrence
 - gated attention with QK-norm, partial RoPE, and GQA
 - SwiGLU MLP
