@@ -183,6 +183,31 @@ mean nothing about hardware. They are there only to show the model produces
 correct, coherent text using the same int8 arithmetic the hardware datapath
 would use.
 
+## Qwen in RTL (in progress)
+
+This is the actual model-on-chip work, and it has started. The approach is one
+module at a time, each written in Verilog and checked in Verilator against the
+golden model, exactly the way the HLS datapath was checked. Nothing here is
+claimed to work until its simulation passes.
+
+Done and proven so far:
+- `rtl/gemv_i8.sv`, the int8 GEMV weight streamer, the block that does the matrix
+  work in every layer. Verified bit-exact against the model (`make -C rtl gemv`):
+  512 output rows, all matching numpy's integer result with no tolerance.
+
+Still to write and verify, then integrate:
+- RMSNorm (two conventions) and the dequant stage
+- the causal conv and the Gated DeltaNet recurrence
+- gated attention with QK-norm, partial RoPE, and GQA
+- SwiGLU MLP
+- embedding lookup and the tied output head
+- a controller that sequences the 24 layers and streams weights from the HBM
+  template that already reaches silicon
+
+When those exist and pass simulation, the design goes through the same HDK chain
+that is already proven (build, AFI, load), and only then does the FPGA generate
+tokens. That last part has not happened yet.
+
 ## Reproduce
 
 Everything except the FPGA build runs on a laptop.

@@ -23,3 +23,6 @@ artifacts/run_hls
 !artifacts/generations.md
 !artifacts/qwen35_int8.manifest.json
 !artifacts/vitis_reports/
+
+# verilator build output
+obj_dir/
