@@ -190,31 +190,42 @@ module at a time, each written in Verilog and checked in Verilator against the
 golden model, exactly the way the HLS datapath was checked. Nothing here is
 claimed to work until its simulation passes.
 
-Done and proven so far:
-- `rtl/gemv_i8.sv`, the int8 GEMV weight streamer, the block that does the matrix
-  work in every layer. Verified bit-exact against the model (`make -C rtl gemv`):
-  512 output rows, all matching numpy's integer result with no tolerance.
-- `rtl/dequant.sv` and `rtl/matvec_i8.sv`, the fixed-point dequant and the
-  complete int8 matrix-vector primitive (GEMV plus dequant) that every layer
-  projection is built from. Verified against the model's fp32 output
-  (`make -C rtl matvec`): 512 rows, worst error 1 LSB in Q14, about 6e-5. Uses
-  only integer multiply and shift, no floating-point unit.
-- `rtl/deltanet_head.sv`, the Gated DeltaNet recurrence, the distinctive part of
-  this model, in fixed point (Q24 state, no floating-point unit). Verified
-  against the warm-state golden vectors (`make -C rtl deltanet`): the output and
-  the evolved state both match the fp32 model to under 0.1 percent. This is the
-  trickiest block, and it is clean.
+Every block the model needs is written in Verilog and passes its Verilator check
+against the golden model. Each has a `make -C rtl <target>`:
+- `gemv_i8.sv` int8 GEMV weight streamer, bit-exact (`gemv`). `dequant.sv` +
+  `matvec_i8.sv`, the int8 matrix-vector primitive every projection uses, worst
+  error 1 LSB in Q14 (`matvec`). Integer multiply and shift only, no float unit.
+- `deltanet_head.sv` the Gated DeltaNet recurrence in Q24 fixed point, output and
+  evolved state under 0.1 percent (`deltanet`). The trickiest block.
+- `rmsnorm.sv` (integer rsqrt), `swiglu.sv`, `conv1d_tap.sv`, `softmax.sv`,
+  `rope.sv`, `gate_math.sv` (interpolated LUTs for exp/sigmoid/softplus),
+  `l2norm.sv`, `gated_norm.sv`, each checked against golden (`rmsnorm`, `swiglu`,
+  `conv`, `softmax`, `rope`, `gate`, `l2norm`, `gnorm`).
+- `deltanet_mixer_core.sv`, the gate + recurrence + gated-norm for all 16 heads
+  with its controller FSM (`mixer16`).
 
-Still to write and verify, then integrate:
-- RMSNorm (two conventions), using a fixed-point reciprocal-sqrt
-- the causal conv, and the gates feeding the recurrence (exp of g, sigmoid of beta)
-- gated attention with QK-norm, partial RoPE, and GQA
-- SwiGLU MLP
+These compose into whole layers, each matched to its golden layer output end to end:
+- `make -C rtl mixerfull` the full DeltaNet mixer (in_proj, conv, silu, l2, 16-head
+  recurrence, out_proj), 1.5 percent.
+- `make -C rtl attnfull` the full attention mixer (q/k/v_proj, QK-norm, RoPE,
+  scores, softmax, context, output gate, o_proj), 2.6 percent.
+- `make -C rtl layer` a complete DeltaNet decoder layer: input norm -> mixer ->
+  residual -> post norm -> MLP -> residual, 1.9 percent.
+- `make -C rtl attnlayer` a complete attention decoder layer, same skeleton with
+  the attention mixer, 2.7 percent.
+
+The MLP in both layers is three int8 matvecs (gate, up, down) with a swiglu between,
+all real RTL. The layer co-sims drive real RTL for the heavy and distinctive compute
+(the matvecs, conv, recurrence core, softmax, swiglu) and proven glue for the light
+elementwise steps (silu, l2 norm, residual add, the scores and context dot products).
+
+Still to assemble:
+- a controller that sequences the 24 layers ([DeltaNet x3, attention] x6), threading
+  the hidden state and streaming per-layer weights from the HBM template that already
+  reaches silicon
 - embedding lookup and the tied output head
-- a controller that sequences the 24 layers and streams weights from the HBM
-  template that already reaches silicon
 
-When those exist and pass simulation, the design goes through the same HDK chain
+When that exists and passes simulation, the design goes through the same HDK chain
 that is already proven (build, AFI, load), and only then does the FPGA generate
 tokens. That last part has not happened yet.
 
