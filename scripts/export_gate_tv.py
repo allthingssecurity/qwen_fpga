@@ -23,7 +23,7 @@ def main():
     cfg = load_config(snap)
     W = load_text_weights(snap, verbose=False)
     p = "layers.0.linear_attn"
-    x = rmsnorm(W["embed_tokens.weight"][6511].astype(np.float32),
+    x = rmsnorm(W["embed_tokens.weight"][11751].astype(np.float32),
                 W["layers.0.input_layernorm.weight"], cfg["rms_norm_eps"])
     a = (W[f"{p}.in_proj_a.weight"] @ x).astype(np.float32)     # [16]
     b = (W[f"{p}.in_proj_b.weight"] @ x).astype(np.float32)     # [16]

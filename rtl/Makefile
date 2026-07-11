@@ -7,8 +7,8 @@
 
 VFLAGS := --cc --exe --build -Wno-WIDTH -Wno-UNOPTFLAT -I.
 
-.PHONY: gemv matvec deltanet rmsnorm swiglu conv softmax rope gate l2norm gnorm all clean
-all: gemv matvec deltanet rmsnorm swiglu conv softmax rope gate l2norm gnorm
+.PHONY: gemv matvec deltanet rmsnorm swiglu conv softmax rope gate l2norm gnorm mixer all clean
+all: gemv matvec deltanet rmsnorm swiglu conv softmax rope gate l2norm gnorm mixer
 
 gemv:
 	cd .. && verilator $(VFLAGS) -Irtl rtl/gemv_i8.sv rtl/tb/sim_gemv.cpp \
@@ -64,6 +64,12 @@ gnorm:
 	cd .. && verilator $(VFLAGS) -Wno-BLKSEQ -Irtl rtl/gated_norm.sv \
 		rtl/tb/sim_gnorm.cpp --top-module gated_norm -o sim_gnorm >/dev/null 2>&1
 	cd .. && ./obj_dir/sim_gnorm
+
+mixer:
+	cd .. && verilator $(VFLAGS) -Wno-BLKSEQ -Irtl rtl/deltanet_mixer_core.sv \
+		rtl/gate_math.sv rtl/deltanet_head.sv rtl/gated_norm.sv \
+		rtl/tb/sim_mixer.cpp --top-module deltanet_mixer_core -o sim_mixer >/dev/null 2>&1
+	cd .. && ./obj_dir/sim_mixer
 
 clean:
 	rm -rf ../obj_dir
