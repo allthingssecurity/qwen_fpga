@@ -9,8 +9,8 @@ VROOT := $(shell verilator --getenv VERILATOR_ROOT)
 
 VFLAGS := --cc --exe --build -Wno-WIDTH -Wno-UNOPTFLAT -I.
 
-.PHONY: gemv matvec deltanet rmsnorm swiglu conv softmax rope gate l2norm gnorm mixer mixer16 front mixerfull all clean
-all: gemv matvec deltanet rmsnorm swiglu conv softmax rope gate l2norm gnorm mixer mixer16 front mixerfull
+.PHONY: gemv matvec deltanet rmsnorm swiglu conv softmax rope gate l2norm gnorm mixer mixer16 front mixerfull attnfull all clean
+all: gemv matvec deltanet rmsnorm swiglu conv softmax rope gate l2norm gnorm mixer mixer16 front mixerfull attnfull
 
 gemv:
 	cd .. && verilator $(VFLAGS) -Irtl rtl/gemv_i8.sv rtl/tb/sim_gemv.cpp \
@@ -98,6 +98,16 @@ mixerfull:
 	cd .. && for m in Vmv Vmo Vcv Vmix; do make -C obj_dir -f $$m.mk >/dev/null 2>&1; done
 	cd .. && clang++ -O2 -std=c++17 -Iobj_dir -I$(VROOT)/include -I$(VROOT)/include/vltstd rtl/tb/sim_mixerfull.cpp $(VROOT)/include/verilated.cpp $(VROOT)/include/verilated_threads.cpp obj_dir/Vmv__ALL.a obj_dir/Vmo__ALL.a obj_dir/Vcv__ALL.a obj_dir/Vmix__ALL.a -pthread -o obj_dir/sim_mixerfull >/dev/null 2>&1
 	cd .. && ./obj_dir/sim_mixerfull
+
+# full attention mixer co-sim
+attnfull:
+	cd .. && rm -rf obj_dir
+	cd .. && verilator --cc -Wno-WIDTH -Wno-UNOPTFLAT -Wno-BLKSEQ -Irtl rtl/matvec_i8.sv rtl/gemv_i8.sv rtl/dequant.sv --prefix Vmv --Mdir obj_dir --top-module matvec_i8 >/dev/null 2>&1
+	cd .. && verilator --cc -Wno-WIDTH -Wno-UNOPTFLAT -Wno-BLKSEQ -Irtl rtl/matvec_i8.sv rtl/gemv_i8.sv rtl/dequant.sv --prefix Vmo --Mdir obj_dir --top-module matvec_i8 -GIN=2048 >/dev/null 2>&1
+	cd .. && verilator --cc -Wno-WIDTH -Wno-UNOPTFLAT -Wno-BLKSEQ -Irtl rtl/softmax.sv --prefix Vsm --Mdir obj_dir --top-module softmax >/dev/null 2>&1
+	cd .. && for m in Vmv Vmo Vsm; do make -C obj_dir -f $$m.mk >/dev/null 2>&1; done
+	cd .. && clang++ -O2 -std=c++17 -Iobj_dir -I$(VROOT)/include -I$(VROOT)/include/vltstd rtl/tb/sim_attnfull.cpp $(VROOT)/include/verilated.cpp $(VROOT)/include/verilated_threads.cpp obj_dir/Vmv__ALL.a obj_dir/Vmo__ALL.a obj_dir/Vsm__ALL.a -pthread -o obj_dir/sim_attnfull >/dev/null 2>&1
+	cd .. && ./obj_dir/sim_attnfull
 
 clean:
 	rm -rf ../obj_dir
