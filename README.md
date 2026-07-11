@@ -199,10 +199,15 @@ Done and proven so far:
   projection is built from. Verified against the model's fp32 output
   (`make -C rtl matvec`): 512 rows, worst error 1 LSB in Q14, about 6e-5. Uses
   only integer multiply and shift, no floating-point unit.
+- `rtl/deltanet_head.sv`, the Gated DeltaNet recurrence, the distinctive part of
+  this model, in fixed point (Q24 state, no floating-point unit). Verified
+  against the warm-state golden vectors (`make -C rtl deltanet`): the output and
+  the evolved state both match the fp32 model to under 0.1 percent. This is the
+  trickiest block, and it is clean.
 
 Still to write and verify, then integrate:
 - RMSNorm (two conventions), using a fixed-point reciprocal-sqrt
-- the causal conv and the Gated DeltaNet recurrence
+- the causal conv, and the gates feeding the recurrence (exp of g, sigmoid of beta)
 - gated attention with QK-norm, partial RoPE, and GQA
 - SwiGLU MLP
 - embedding lookup and the tied output head
