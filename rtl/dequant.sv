@@ -11,13 +11,14 @@
 
 module dequant #(
     parameter int SHIFT = 16,   // extra fractional bits in mult, removed by shift
-    parameter int OUTQ  = 14    // fractional bits kept in the output (Q(OUTQ))
+    parameter int OUTQ  = 14,   // fractional bits kept in the output (Q(OUTQ))
+    parameter int OUTW  = 16    // output width; widen for paths that need range+precision
 ) (
-    input  logic                in_vld,
-    input  logic signed [31:0]  acc,
-    input  logic signed [31:0]  mult,
-    output logic signed [15:0]  y_q,
-    output logic                out_vld
+    input  logic                    in_vld,
+    input  logic signed [31:0]      acc,
+    input  logic signed [31:0]      mult,
+    output logic signed [OUTW-1:0]  y_q,
+    output logic                    out_vld
 );
     logic signed [63:0] p;
     always_comb begin
