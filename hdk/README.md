@@ -24,8 +24,14 @@ post-route DCP, and was ingested into an AFI:
 - `FpgaImageId: afi-015d193d047cd142a`
 - `FpgaImageGlobalId: agfi-0571b2a727ab7ed78`
 
-This is a real FPGA image for the VU47P holding the int8 matvec datapath. Loading it
-on an f2 and running the host against it is the last step.
+This is a real FPGA image for the VU47P holding the int8 matvec datapath.
+
+**It ran on silicon and passed.** Loaded agfi-01bd303a0be9536ce on an f2.6xlarge and
+ran `test_qwen_engine`: `64/64 rows correct (status=0x1)`, matching the golden dequant
+matvec over PCIe. Full transcript in `../artifacts/fpga_run.txt`. (The first AFI,
+afi-015d193d047cd142a, read back status=0x0 because the AXI-Lite write needed AWVALID
+and WVALID in the same cycle; the fix latches them independently. v2 is the one that
+runs.)
 
 ## Timing note (real bring-up finding)
 

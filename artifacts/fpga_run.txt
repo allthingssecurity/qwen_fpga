@@ -1,0 +1,19 @@
+Qwen int8 matvec datapath on real AWS F2 silicon (VU47P)
+=========================================================
+AFI:  afi-0b5c8b485bb2ff119
+AGFI: agfi-01bd303a0be9536ce  (loaded on slot 0, f2.6xlarge)
+Clock: clk_main_a0 fixed 250 MHz.  Post-route WNS +0.028 ns (timing met).
+
+$ sudo fpga-load-local-image -S 0 -I agfi-01bd303a0be9536ce
+AFI  0  agfi-01bd303a0be9536ce  loaded  0  ok  0  0x10212415
+
+$ sudo ./test_qwen_engine 0
+FPGA qwen_matvec_engine: 64/64 rows correct  (y[0]=316 golden=316, status=0x1)
+PASS  int8 matvec ran on the FPGA and matches golden
+
+The host wrote the int8 activation, per-row dequant multipliers, and a 64x1024
+weight tile to the engine's OCL AXI-Lite BRAM over PCIe, pulsed start, polled done
+(status bit0 = 0x1), and read back 64 int16 results. All 64 match the golden
+dequant matvec the model check uses. This is the int8 matvec datapath (the block
+every Qwen layer is built from) executing on the chip, not a bandwidth benchmark
+and not the CPU model. The full 24-layer model on the chip is still ahead.
