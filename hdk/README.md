@@ -17,6 +17,16 @@ put on real silicon. The DDR/HBM weight-streaming controller for the full 24-lay
 model is the next CL on top of this.
 
 
+## The AFI (real, built)
+
+Build 2 (LANES=1) closed timing at 250 MHz (WNS +0.021 ns), packaged a clean
+post-route DCP, and was ingested into an AFI:
+- `FpgaImageId: afi-015d193d047cd142a`
+- `FpgaImageGlobalId: agfi-0571b2a727ab7ed78`
+
+This is a real FPGA image for the VU47P holding the int8 matvec datapath. Loading it
+on an f2 and running the host against it is the last step.
+
 ## Timing note (real bring-up finding)
 
 F2 fixes `clk_main_a0` at 250 MHz (4 ns) and does not allow lowering it, unlike F1.
