@@ -15,14 +15,17 @@ static Vqwen_matvec_engine* e;
 static void tick(){ e->clk=0; e->eval(); e->clk=1; e->eval(); }
 
 static void axi_w(uint32_t a, uint32_t d){
-  e->s_awaddr=a; e->s_awvalid=1; e->s_wdata=d; e->s_wstrb=0xF; e->s_wvalid=1; e->s_bready=1;
-  // wait for the accept cycle (awready&&wready sampled high at the edge)
-  int g=0; while(!(e->s_awready && e->s_wready) && g++<100) tick();
-  tick();                                   // the write fires on this edge
-  e->s_awvalid=0; e->s_wvalid=0;
+  // present AW and W on SEPARATE cycles (a real master may) to exercise the
+  // independent-latch handshake; the same-cycle-only version never started on silicon
+  e->s_bready=1;
+  e->s_awaddr=a; e->s_awvalid=1;
+  int g=0; while(!e->s_awready && g++<100) tick();
+  tick(); e->s_awvalid=0;                    // AW accepted
+  e->s_wdata=d; e->s_wstrb=0xF; e->s_wvalid=1;
+  g=0; while(!e->s_wready && g++<100) tick();
+  tick(); e->s_wvalid=0;                      // W accepted, a cycle later
   g=0; while(!e->s_bvalid && g++<100) tick();
-  tick();                                   // consume bvalid (bready held high)
-  e->s_bready=0;
+  tick(); e->s_bready=0;                      // consume bvalid
 }
 static uint32_t axi_r(uint32_t a){
   e->s_araddr=a; e->s_arvalid=1; e->s_rready=1;
@@ -53,6 +56,8 @@ int main(int argc,char**argv){
 
   // load over AXI-Lite
   axi_w(0x00008, IN); axi_w(0x0000C, OUT);
+  uint32_t rb=axi_r(0x00008);                 // readback confirms writes land
+  if((int)rb!=IN){ std::printf("FAIL readback: r_in=%u expected %d\n", rb, IN); return 1; }
   for(int i=0;i<IN;i++)  axi_w(0x10000 + i*4, (uint32_t)(uint8_t)x[i]);
   for(int o=0;o<OUT;o++) axi_w(0x20000 + o*4, (uint32_t)mult[o]);
   for(int o=0;o<OUT;o++) for(int wd=0;wd<IN/LANES;wd++){
