@@ -5,13 +5,16 @@
 // per-row multipliers, pulses start, then reads the int16 results back. It runs the
 // exact matvec_i8 that make -C rtl matvec checks bit-for-bit against the model.
 //
-// LANES=4 so a weight word is 32 bits and maps to one AXI-Lite write. Address map
-// (AXI-Lite, byte address, 64 KiB regions selected by addr[19:16]):
-//   0x0_0000  regs   0x00 CTRL(w bit0 start) 0x04 STATUS(r done,busy) 0x08 IN 0x0C OUTROWS
-//   0x1_0000  X BRAM     int8 activation, low byte of each word
-//   0x2_0000  MULT BRAM  per-row int32 dequant multiplier
-//   0x4_0000  W BRAM     int8 weights row-major, 4 int8 packed per word
-//   0x8_0000  Y BRAM     int16 results (read only), sign-extended
+// LANES=1: one int8 MAC per cycle. F2 fixes clk_main_a0 at 250 MHz (4 ns), so the
+// per-cycle logic must be short; a single int8 multiply-accumulate closes timing
+// where a 4-wide MAC carry chain did not. Address map (AXI-Lite, byte address): the
+// weight BRAM is large at LANES=1 so it gets its own region at addr[20]; the small
+// blocks sit in 64 KiB regions selected by addr[19:16]:
+//   0x00_0000  regs   0x00 CTRL(w bit0 start) 0x04 STATUS(r done,busy) 0x08 IN 0x0C OUTROWS
+//   0x01_0000  X BRAM     int8 activation, low byte of each word
+//   0x02_0000  MULT BRAM  per-row int32 dequant multiplier
+//   0x08_0000  Y BRAM     int16 results (read only), sign-extended
+//   0x10_0000  W BRAM     int8 weights row-major, LANES int8 per word
 //
 // Small and BRAM-resident so the first AFI build is robust; the DDR/HBM weight
 // streaming controller is the next iteration on top of this.
@@ -19,7 +22,7 @@
 module qwen_matvec_engine #(
     parameter int IN_MAX  = 1024,
     parameter int OUT_MAX = 64,
-    parameter int LANES   = 4
+    parameter int LANES   = 1
 ) (
     input  logic         clk,
     input  logic         rst_n,
@@ -69,18 +72,21 @@ module qwen_matvec_engine #(
             start <= 1'b0;
             if (wr_fire) begin
                 s_bvalid <= 1'b1;
-                unique case (s_awaddr[19:16])
-                    4'h0: unique case (s_awaddr[7:2])
-                              6'd0: if (s_wdata[0]) start <= 1'b1;
-                              6'd2: r_in      <= s_wdata[15:0];
-                              6'd3: r_outrows <= s_wdata[15:0];
-                              default: ;
-                          endcase
-                    4'h1: xmem[s_awaddr[2+:XW]] <= s_wdata[7:0];
-                    4'h2: mmem[s_awaddr[2+:OW]] <= s_wdata;
-                    4'h4: wmem[s_awaddr[2+:WW]] <= s_wdata[LANES*8-1:0];
-                    default: ;
-                endcase
+                if (s_awaddr[20]) begin
+                    wmem[s_awaddr[2+:WW]] <= s_wdata[LANES*8-1:0];   // large weight region
+                end else begin
+                    unique case (s_awaddr[19:16])
+                        4'h0: unique case (s_awaddr[7:2])
+                                  6'd0: if (s_wdata[0]) start <= 1'b1;
+                                  6'd2: r_in      <= s_wdata[15:0];
+                                  6'd3: r_outrows <= s_wdata[15:0];
+                                  default: ;
+                              endcase
+                        4'h1: xmem[s_awaddr[2+:XW]] <= s_wdata[7:0];
+                        4'h2: mmem[s_awaddr[2+:OW]] <= s_wdata;
+                        default: ;
+                    endcase
+                end
             end else if (s_bvalid && s_bready) begin
                 s_bvalid <= 1'b0;
             end

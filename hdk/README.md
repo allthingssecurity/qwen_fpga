@@ -16,6 +16,17 @@ dequant matvec (64/64 rows). This is the datapath every Qwen layer is built from
 put on real silicon. The DDR/HBM weight-streaming controller for the full 24-layer
 model is the next CL on top of this.
 
+
+## Timing note (real bring-up finding)
+
+F2 fixes `clk_main_a0` at 250 MHz (4 ns) and does not allow lowering it, unlike F1.
+The first build routed but missed timing by 0.8 ns: the worst path was the LANES=4
+int8 multiply-accumulate, a 17-level chain with 10 CARRY8 blocks off a BRAM read.
+Fix: LANES=1 (one int8 MAC per cycle), which roughly halves the carry chain and
+closes 250 MHz. The weight BRAM is larger at LANES=1, so it moved to its own
+address region (addr[20]). Throughput drops but this is a functional proof; the
+streaming controller will pipeline the MAC to get the width back.
+
 ## The build, step by step (what was actually run)
 
 On an FPGA Developer AMI instance (Vivado 2025.2, >=64 GiB RAM):

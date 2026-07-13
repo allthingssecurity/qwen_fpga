@@ -40,7 +40,7 @@ int main(int argc,char**argv){
   e->rst_n=0; e->s_awvalid=e->s_wvalid=e->s_bready=e->s_arvalid=e->s_rready=0;
   tick(); tick(); e->rst_n=1; tick();
 
-  const int IN=1024, OUT=64, LANES=4;
+  const int IN=1024, OUT=64, LANES=1;
   std::vector<int8_t> x(IN), w((size_t)OUT*IN); std::vector<int32_t> mult(OUT);
   for(int i=0;i<IN;i++) x[i]=(int8_t)(((i*7+3)%127)-63);
   for(int o=0;o<OUT;o++){ for(int i=0;i<IN;i++) w[(size_t)o*IN+i]=(int8_t)(((o*13+i*5+1)%127)-63);
@@ -57,7 +57,7 @@ int main(int argc,char**argv){
   for(int o=0;o<OUT;o++) axi_w(0x20000 + o*4, (uint32_t)mult[o]);
   for(int o=0;o<OUT;o++) for(int wd=0;wd<IN/LANES;wd++){
     uint32_t word=0; for(int j=0;j<LANES;j++) word|=(uint32_t)(uint8_t)w[(size_t)o*IN+wd*LANES+j]<<(j*8);
-    axi_w(0x40000 + (o*(IN/LANES)+wd)*4, word);
+    axi_w(0x100000 + (o*(IN/LANES)+wd)*4, word);      // weights in the addr[20] region
   }
   // run
   axi_w(0x00000, 1);
