@@ -99,6 +99,14 @@ mixerfull:
 	cd .. && clang++ -O2 -std=c++17 -Iobj_dir -I$(VROOT)/include -I$(VROOT)/include/vltstd rtl/tb/sim_mixerfull.cpp $(VROOT)/include/verilated.cpp $(VROOT)/include/verilated_threads.cpp obj_dir/Vmv__ALL.a obj_dir/Vmo__ALL.a obj_dir/Vcv__ALL.a obj_dir/Vmix__ALL.a -pthread -o obj_dir/sim_mixerfull >/dev/null 2>&1
 	cd .. && ./obj_dir/sim_mixerfull
 
+# synthesizable AXI-Lite matvec engine (first-silicon datapath) co-sim
+engine:
+	cd .. && rm -rf hdk/obj_dir
+	cd .. && verilator --cc -Wno-WIDTH -Wno-UNOPTFLAT -Wno-WIDTHTRUNC -Irtl hdk/design/qwen_matvec_engine.sv rtl/matvec_i8.sv rtl/gemv_i8.sv rtl/dequant.sv --prefix Vqwen_matvec_engine --top-module qwen_matvec_engine --Mdir hdk/obj_dir >/dev/null 2>&1
+	cd .. && make -C hdk/obj_dir -f Vqwen_matvec_engine.mk >/dev/null 2>&1
+	cd .. && clang++ -O2 -std=c++17 -Ihdk/obj_dir -I$(VROOT)/include -I$(VROOT)/include/vltstd hdk/verif/sim_engine.cpp $(VROOT)/include/verilated.cpp $(VROOT)/include/verilated_threads.cpp hdk/obj_dir/Vqwen_matvec_engine__ALL.a -pthread -o hdk/obj_dir/sim_engine >/dev/null 2>&1
+	cd .. && ./hdk/obj_dir/sim_engine
+
 # whole model, one decode step through all 24 layers on the real RTL blocks
 model:
 	cd .. && python3 scripts/export_model_tv.py
