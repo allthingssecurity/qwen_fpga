@@ -1,246 +1,277 @@
-# Qwen on FPGA: what we built, how, and what "full model" actually takes
+# We Put a Piece of Qwen on an FPGA. Here Is What Actually Worked
 
-Written to be read start to finish. It starts from FPGA basics, explains why an
-FPGA is a natural fit for language-model inference, walks the whole path we took,
-states plainly what runs on real silicon today, and is honest about the gap to
-running the full model. No marketing.
+There is a tempting version of this story where we say we ran Qwen on an FPGA and
+leave it at that.
 
----
+That would sound impressive. It would also be wrong.
 
-## 1. What an FPGA actually is
+What we actually did is more useful. We built a correct software reference for
+Qwen3.5-0.8B, translated its important operations into hardware, ran the complete
+24-layer model through those hardware blocks in simulation, found and fixed a
+precision problem that only appeared at full depth, and then took the core int8
+matrix-vector engine all the way to a real AWS F2 FPGA.
 
-A CPU is fixed silicon that reads instructions and executes them one stream at a
-time. A GPU is fixed silicon with thousands of small cores doing the same operation
-across lots of data. Both are built once at the factory and you write software for
-them.
+On the chip, that engine produced 64 correct results out of 64. The result matched
+our golden reference exactly.
 
-An **FPGA (Field-Programmable Gate Array) is a chip whose logic is not fixed.** It
-is a sea of tiny hardware primitives plus a routing fabric, and you decide how they
-connect. You are not writing software that runs on a processor; you are describing a
-**circuit**, and the chip becomes that circuit. The primitives on the AWS F2 chip
-(a Xilinx Virtex UltraScale+ VU47P) are:
+The full model is not on the FPGA yet. No prompt has gone into the chip and no token
+has come out of it. The controller and the HBM weight-streaming path still have to
+be built.
 
-- **LUTs (lookup tables):** the atoms of logic. A LUT is a tiny truth table that can
-  become any small boolean function (an AND, a mux, part of an adder). There are
-  ~1.3 million of them.
-- **FFs (flip-flops):** 1-bit registers. They hold a value and update on the clock
-  edge. This is how a circuit has state and pipelining.
-- **DSP blocks:** hardened multiply-accumulate units. ~9,000 of them. Each does a
-  fast multiply plus add. This is what you build matrix math out of.
-- **BRAM / URAM:** on-chip memory blocks, small but very fast, right next to the
-  logic. Tens of megabits total. This is your scratchpad.
-- **HBM:** 16 GiB of high-bandwidth DRAM stacked on the same package, ~460 GB/s.
-  This is where big things (like model weights) live because they don't fit on-chip.
+This distinction matters. In hardware work, a clean boundary between what is proven
+and what is planned is not modesty. It is the work.
 
-You describe the circuit in an HDL (Hardware Description Language) — we used
-**Verilog/SystemVerilog**. A toolchain (Xilinx Vivado) then does:
+## Why try an FPGA in the first place?
 
-1. **Synthesis** — turn your Verilog into a netlist of LUTs/FFs/DSPs/BRAM.
-2. **Place** — decide which physical LUT/DSP/BRAM on the die each piece uses.
-3. **Route** — connect them through the fabric.
-4. **Timing closure** — prove every signal arrives before the next clock edge.
+A CPU executes a stream of instructions. A GPU has many fixed compute units and is
+very good at doing the same operation over a large amount of data. An FPGA is
+different. It contains programmable logic, registers, memory blocks, multipliers,
+and a large routing fabric. We describe a circuit, and the chip becomes that
+circuit.
 
-That last step is the one people underestimate, and it bit us (section 6).
+This makes an FPGA a good place to explore what a specialised language-processing
+chip could look like. We can remove the parts meant for general-purpose computing
+and build only the datapath needed by the transformer.
 
-### Why "everything happens at once" matters
+For single-token LLM decoding, the main limit is often memory bandwidth. To produce
+one token, the machine must read the model weights and perform a relatively small
+amount of work per byte. The arithmetic matters, but keeping the weights moving
+without stalls matters even more.
 
-On a CPU, `y = W @ x` is a loop: millions of multiply-add instructions, one after
-another. On an FPGA you can lay down a datapath where, every single clock cycle, a
-row of multiply-accumulates happens **in parallel in dedicated hardware**, and the
-weights stream past that hardware. There is no instruction fetch, no cache miss, no
-scheduler. The circuit does exactly one job, and it does it every cycle. That is the
-whole appeal for a workload as repetitive as a transformer.
+Qwen3.5-0.8B is an interesting model for this experiment. Its text path has 24
+layers arranged as three Gated DeltaNet layers followed by one full-attention layer,
+repeated six times. Only six layers maintain a growing KV cache. The other 18 use a
+fixed recurrent state. That makes the model a sensible candidate for a streaming
+design.
 
----
+At int8, the model needs about 0.7586 GB of weight reads per generated token. The AWS
+F2 device has 16 GiB of HBM and a peak memory bandwidth near 460 GB/s. In a separate
+on-chip bandwidth test, we measured 426.14 GB/s of reads. The simple division gives
+a theoretical ceiling near 562 tokens per second.
 
-## 2. Why an FPGA is close to a "Language Processing Unit"
+That is a projection, not a Qwen benchmark. Qwen has not produced tokens on this
+FPGA. We use the number only to explain why the architecture is worth pursuing.
 
-A GPU is a general parallel machine that happens to be good at LLMs. The idea of a
-**Language Processing Unit (LPU)** is the opposite: a chip whose datapath *is* the
-transformer, with nothing wasted on generality. FPGAs let you prototype exactly that
-without taping out a custom chip. Two facts about LLM **decoding** (generating one
-token at a time) make this fit especially well:
+## We started with software, not Verilog
 
-**Decode is memory-bandwidth-bound, not compute-bound.** To produce one token you
-read every weight of the model exactly once and do relatively little math per weight.
-So the speed limit is *how fast you can stream the weights past the compute*, not how
-many multipliers you have. A 0.8B-parameter model at int8 is ~0.76 GB per token; at
-460 GB/s that ceiling is ~600 tokens/sec. The design that wins is the one that keeps
-the weights flowing and never stalls — a **streaming datapath**, which is precisely
-what an FPGA is good at.
+Before writing hardware, we needed an answer key.
 
-**int8 is enough, and int8 is cheap in hardware.** Full-precision floats are
-expensive in fabric. 8-bit integer multiply-accumulate is tiny and fast. If you
-quantize the model to int8 (we did, and verified it keeps the right answer), each
-weight is one byte and each multiply is trivial. This is why the automated
-"compile PyTorch straight to FPGA" projects blow up — they keep everything in wide
-floats on-chip and need ~140x more logic than exists. The frugal path is:
-hand-designed int8, weights in HBM, streaming past a small compute datapath. That is
-the design philosophy of this whole repo, and it is what an LPU-style chip would do.
+We wrote a from-scratch NumPy implementation of Qwen3.5-0.8B decoding and checked it
+step by step against the PyTorch model. The worst hidden-state deviation was
+1.9e-06, and the worst logit deviation was 7.5e-06.
 
-So: an FPGA running a hand-built int8 streaming transformer datapath is a working
-model of what a dedicated language-processing chip would be. That is the thesis.
+This reference model caught details that would have been painful to debug later. For
+example, the model uses two RMSNorm conventions. One uses a gain of 1 plus the
+stored weight because its parameters are centred at zero. The gated DeltaNet norm
+uses the stored weight directly. Both look like RMSNorm in a diagram, but confusing
+them makes the model quietly drift away from the correct output.
 
----
+We then quantised the weights per output channel to int8 and tested the result over
+multiple prompts. Int8 weights with floating-point activations had 97.9 percent
+top-1 agreement. Int8 weights and int8 activations had 94.8 percent agreement. More
+importantly for this build, the quantised reference still predicted the correct next
+token used in our full-model verification.
 
-## 3. What we actually built (the whole path)
+Only after this did we begin treating the software output as golden data for the
+hardware.
 
-The work went from a correct software reference down to real silicon, in layers,
-each one checked against the one above it. Nothing was claimed done until its check
-passed.
+## Building the transformer one block at a time
 
-**(a) A golden software model.** A from-scratch numpy implementation of Qwen3.5-0.8B
-decoding, checked bit-for-bit against PyTorch. This is the reference every later
-stage is measured against. It captures the real architecture: 24 layers in a
-`[DeltaNet x3, attention] x6` pattern, two very different mixer types, RMSNorm, the
-gated DeltaNet recurrence, gated attention with QK-norm and partial RoPE, and the
-SwiGLU MLP. We also built the int8-quantized version and confirmed it still predicts
-the same tokens.
+The first hardware-shaped version was written in HLS C++. It helped us explore the
+datapath and verify the model structure. But the F2 Vitis flow could not give us a
+loadable FPGA image, so real silicon required the RTL and HDK route.
 
-**(b) The datapath in HLS C++.** A first hardware-shaped description (High-Level
-Synthesis) of the decode datapath, checked against the golden model. Useful for
-exploring structure, but on F2 the HLS/Vitis flow can only do emulation — it cannot
-produce a loadable FPGA image. That pushed us to the RTL/HDK flow for real silicon.
+We wrote the model blocks in Verilog and SystemVerilog. The int8 matrix-vector unit,
+the Gated DeltaNet recurrence, RMSNorm, SwiGLU, causal convolution, softmax, rotary
+position handling, gate functions, L2 normalisation, and gated normalisation were
+all checked against golden vectors.
 
-**(c) Every block written in real RTL (Verilog) and verified.** One module at a time,
-each simulated in Verilator against the golden vectors, exact for integer blocks and
-within tight fixed-point tolerance otherwise:
-- `gemv_i8` / `matvec_i8` — the int8 matrix-vector engine (the workhorse; every
-  projection in every layer is this).
-- `deltanet_head` / `deltanet_mixer_core` — the gated DeltaNet recurrence in Q24
-  fixed point (the hardest block; no floating point unit anywhere).
-- `rmsnorm`, `swiglu`, `conv1d_tap`, `softmax`, `rope`, `gate_math`, `l2norm`,
-  `gated_norm` — norms, activations, the causal conv, the attention softmax, all in
-  integer/fixed-point math with lookup tables for the nonlinearities.
+The process was deliberately boring:
 
-**(d) The blocks composed into whole layers, end to end.** Both mixer types
-assembled and checked against golden (`make -C rtl mixerfull`, `attnfull`), then both
-complete decoder layers — norm, mixer, residual, norm, MLP, residual
-(`make -C rtl layer`, `attnlayer`), each matching the reference to ~2%.
+1. Build one block.
+2. Compare it with the software reference.
+3. Fix it until the numbers agree.
+4. Compose it into the next larger unit.
 
-**(e) The whole 24-layer model, in simulation, predicting the right token.**
-`make -C rtl model` runs one full decode step through all 24 layers on the real RTL
-blocks — embedding in, the layers sequenced in the true pattern, hidden state
-threaded through, final norm, output head — and it predicts the **same next token as
-the fp32 reference**. This runs in a Verilog simulator on a laptop, not on the chip,
-but it proves the whole model's hardware datapath is correct.
+The blocks became complete DeltaNet and attention mixers. The mixers became complete
+decoder layers with normalisation, residual paths, and the MLP. Finally, the same
+RTL compute blocks were reused across all 24 layers for one complete decode step.
 
-**(f) The core compute block taken all the way to real silicon.** We wrapped the int8
-matvec engine as an AWS F2 custom-logic design driven by the host over an AXI-Lite
-bus, built it through Vivado to a placed-and-routed image that **closes timing at
-250 MHz**, ingested it into a real **AFI (Amazon FPGA Image)**, loaded it onto a real
-f2 FPGA, and ran it. The host wrote an int8 input and a weight tile into the chip,
-said go, and read back results that matched the golden math **64 out of 64, exactly**.
-Transcript and AFI id are in `artifacts/fpga_run.txt`.
+The simulation began with an embedding, followed the true layer pattern, threaded
+the hidden state and warm recurrent or KV state through the model, applied the final
+normalisation and tied output head, and selected the next token.
 
----
+It predicted the same token as the fp32 reference. The hidden-state error stayed
+near 2 percent through all 24 layers, so the matching token was not a lucky result.
 
-## 4. What runs on real silicon today — stated plainly
+This was the first point where we could say that the full model arithmetic worked
+end to end in the hardware datapath. It was still a simulator running on a laptop,
+but it was exercising the real RTL blocks.
 
-The one thing running on the actual chip is the **int8 matrix-multiply datapath**,
-on a small test tile (a 1024-long input times a 64x1024 weight tile), driven by the
-host, producing correct results. That is the exact arithmetic block every layer of
-Qwen is built from.
+## The wrong token taught us more than the right one
 
-What is **not** on the chip: the full 24-layer model, the controller that sequences
-it, weight streaming from HBM, the embedding, and the output head. No prompt has gone
-to the chip; no token has come out of the chip. "Prompt in, text out" still runs on
-the CPU/simulation model.
+The first full-model run did not pass. It predicted the wrong token.
 
-So the accurate one-liner is: **the compute unit is proven on silicon; the full
-model is proven in simulation; the two have not been joined yet.**
+This was useful because the smaller tests had all looked fine. There were no
+saturations. The int8 reference predicted the correct token. The fixed-point
+DeltaNet recurrence matched floating point to under 0.2 percent. Yet the full model
+drifted to a nearby but incorrect answer.
 
----
+The problem was one intermediate format.
 
-## 5. Findings along the way (this is where the real work was)
+The DeltaNet input projection was stored as a 16-bit Q10 value. Its range was large
+enough, but smaller channels lost too much fractional precision. The following
+per-head L2 normalisation turned that small absolute error into a larger direction
+error. The recurrence then carried the error forward, layer after layer.
 
-These are the non-obvious problems that only showed up because each stage was
-actually checked. They are worth listing because they are what "engineering" meant
-here.
+We widened that path to a 32-bit Q20 format. The per-layer error dropped from more
+than 20 percent to about 2 percent, and the final prediction became correct.
 
-- **RMSNorm convention.** The model has two different RMSNorm variants (one uses a
-  `1+weight` gain with zero-centered parameters, one uses plain weight). Getting this
-  wrong made the golden model silently diverge. Fixed by matching the real weights.
-- **Fixed-point overflow in the recurrence.** 32x32 multiplies in the DeltaNet
-  recurrence overflowed when computed in 32 bits before the shift; sign-extending to
-  64 bits first fixed a 6000x error.
-- **Precision, not quantization, was the accuracy limit at full depth.** The first
-  full-model sim predicted the *wrong* token. It was not int8 (a pure int8 model
-  predicts correctly) and not the recurrence (exact to 0.2%). It was one intermediate
-  format: the DeltaNet input projection kept only 10 fractional bits, and after the
-  per-head L2 norm that coarseness became a large direction error that the recurrence
-  amplified over 24 layers. Widening that one path to a 32-bit/Q20 format dropped the
-  per-layer error from >20% to ~2% and the prediction became correct. This is the
-  kind of thing only a full-depth run surfaces.
-- **F2 fixes the clock at 250 MHz.** The first silicon build routed but **missed
-  timing by 0.8 ns**. Unlike the older F1, F2 does not let you slow the fabric clock.
-  The critical path was the multiply-accumulate carry chain. Narrowing it to one MAC
-  per cycle closed timing (+0.021 ns). Real, and only visible after place-and-route.
-- **AXI handshake bug that only appeared on hardware.** The first AFI loaded but the
-  engine never started (status read back 0). The cause: my bus slave required the
-  address and data to arrive on the *same* cycle; a real bus master presents them
-  separately. The simulator happened to drive them together, so it passed in sim and
-  failed on silicon. Fixed by latching address and data independently — and the
-  testbench now drives them apart so this can't hide again.
+This is why an isolated kernel result is not enough. A format that passes one layer
+can fail after 24. Full-depth verification showed us where the model was genuinely
+sensitive.
 
-Every one of these is a real hardware-bring-up lesson, not a detail.
+## Then came the real chip
 
----
+For silicon, we started with the workhorse of the network: the int8 matrix-vector
+engine. Every projection in every layer depends on this arithmetic.
 
-## 6. Is running full Qwen "just a matter of scaling"? Honestly, no.
+We wrapped the engine as an AWS F2 custom-logic design with an AXI-Lite interface.
+The host writes a 1024-element int8 activation vector, per-row dequantisation
+multipliers, and a 64 by 1024 weight tile into the FPGA. It starts the engine, waits
+for completion, and reads back 64 int16 outputs.
 
-This is the important part, and I want to be straight rather than encouraging.
+The first complete FPGA build routed, but it missed the fixed 250 MHz timing target
+by 0.8 ns. The critical path ran through a wide multiply-accumulate carry chain. F2
+does not allow us to solve this by lowering the main clock. We reduced the engine to
+one MAC lane per cycle, shortened the path, and rebuilt it.
 
-**What genuinely carries over (a lot):** the entire compute story is done and proven.
-The int8 matvec runs on silicon. Every other block (recurrence, norms, softmax,
-swiglu, conv, RoPE, gates) is written and verified in simulation. The full model's
-math is proven correct end to end in the simulator. The AFI build/load/run flow works.
-The quantization scheme is validated. None of that has to be reinvented. In that
-sense the hard *arithmetic* and the *toolchain path* are behind us.
+The next build met timing with 0.028 ns to spare.
 
-**What is genuinely new work (not scaling):** getting from "a matmul runs on the chip"
-to "a prompt produces a token on the chip" needs four things that do not exist as
-hardware yet, and they are real hardware, not bigger versions of what's there:
+Then the first image loaded, but the engine did not start. The status register stayed
+at zero. Our AXI-Lite slave was accepting a write only when the address and data
+arrived in the same cycle. The simulator happened to present them together. The real
+bus master did not.
 
-1. **A controller.** Today the thing that sequences the 24 layers, threads the hidden
-   state from one into the next, and orchestrates embedding and the output head is a
-   C++ program on the host (the simulation harness). On the chip that has to become a
-   **finite-state machine in Verilog** that drives the datapath. That is a new module,
-   and it is the brain of the design.
-2. **HBM weight streaming.** The silicon demo put a tiny weight tile in on-chip BRAM
-   and loaded it with slow host writes. The real model's 0.8B weights do not fit
-   on-chip at all — they must **stream from HBM** through an AXI memory interface,
-   continuously, without stalling the compute. Building that streaming path (and
-   keeping it fed) is the single biggest new piece, and it is exactly where the
-   performance lives.
-3. **Embedding lookup and the output head.** Turning a token id into a vector at the
-   input, and turning the final vector into a next-token choice over a 248k-word
-   vocabulary at the output. Both are memory-bound lookups/matmuls that need to be
-   wired into the datapath.
-4. **A much larger CL build.** All of the above is a substantially bigger custom-logic
-   design than the one-block engine we shipped. It will take more resources, will be
-   harder to close at 250 MHz, and will take several build-and-fix iterations — the
-   same kind we already hit, but more of them.
+We changed the slave to latch the address and data independently. We also changed
+the testbench to deliver them separately so that this bug cannot hide there again.
 
-So the honest framing is not "we have a small kernel, now just make it big." It is:
-**we proved the arithmetic and the full-model math, and we proved one block on real
-silicon; the remaining work is building the control and memory-streaming hardware
-that turns that block into the whole model on the chip.** That is a real project — a
-meaningful fraction of the total effort still ahead — but it is now standing on top
-of a verified datapath and a working silicon flow, which is the part most people
-never get through.
+The corrected FPGA image was loaded on an f2.6xlarge:
 
----
+```text
+AFI:  afi-0b5c8b485bb2ff119
+AGFI: agfi-01bd303a0be9536ce
+Clock: 250 MHz
+Post-route WNS: +0.028 ns
+```
 
-## 7. Where to see each claim in the repo
+The host sent the input and weights over PCIe, started the engine, and read the
+results back:
 
-- `golden/` — the numpy reference, checked against PyTorch.
-- `rtl/` + `make -C rtl <block>` — every verified hardware block.
-- `make -C rtl model` — the whole model in simulation, predicting the golden token.
-- `make -C rtl engine` — the silicon engine verified over its own AXI bus.
-- `hdk/` + `hdk/README.md` — the F2 build flow, the CL, the host program.
-- `artifacts/fpga_run.txt` — the actual on-silicon run: AFI id, load, 64/64 result.
-- `docs/full_model.md` — the full-model simulation and the precision finding.
+```text
+FPGA qwen_matvec_engine: 64/64 rows correct
+y[0]=316 golden=316, status=0x1
+PASS
+```
 
-The top-level `README.md` "Status" section is kept honest: what runs on the chip,
-what runs only in simulation, and what has not happened.
+That was the moment the project crossed from a simulation result into a silicon
+result. It was a small tile, and it was only one compute block, but it was the real
+block, on the real device, returning the exact expected answer.
+
+## How the chip actually runs the math
+
+This is the part worth understanding in detail, because it is what "ran on the FPGA"
+really means. There is no processor executing our code on the chip. There is a
+circuit, and the host talks to it through memory.
+
+**1. The image becomes the circuit.** An AFI is our placed-and-routed design turned
+into a configuration bitstream. `fpga-load-local-image -S 0 -I agfi-...` streams that
+bitstream into the FPGA and reprograms its fabric. After that command, the LUTs, the
+flip-flops, the DSP multiplier, and the BRAM blocks on the die are physically wired
+into our matrix-vector engine. The chip is no longer generic; it is our circuit until
+we clear or replace it.
+
+**2. The host reaches the circuit through a PCIe memory window.** The AWS shell
+exposes our engine's control bus (an AXI-Lite interface called OCL) as a region of
+PCIe memory, BAR0. From the host, `fpga_pci_poke(addr, value)` is a write into that
+window and `fpga_pci_peek(addr)` is a read. Each poke/peek becomes one AXI-Lite
+transaction that arrives at our circuit as an address and a data word. In other
+words, the host and the FPGA share an address map, and reading or writing an address
+on the host side pushes data straight into or out of our hardware.
+
+**3. Inside the circuit, addresses select on-chip memories.** Our engine decodes the
+incoming address:
+- writes to `0x01_0000+` land in the activation BRAM (the 1024 int8 input values),
+- writes to `0x02_0000+` land in the multiplier BRAM (the per-row dequant scales),
+- writes to `0x10_0000+` land in the weight BRAM (the 64 by 1024 int8 tile),
+- a write to `0x00` sets the start bit,
+- reads of `0x04` return the status bits, and reads of `0x08_0000+` return results.
+
+So loading the problem is just the host writing into three on-chip memories through
+the PCIe window, one 32-bit word at a time.
+
+**4. A hardware state machine runs the matmul.** Writing the start bit triggers a
+finite-state machine clocked at 250 MHz. It streams the resident activation into the
+GEMV, then streams the weight tile one int8 per cycle. Every cycle the DSP multiplies
+a weight by the matching activation and accumulates. At the end of each 1024-long
+row it has one 32-bit dot product; the dequant stage multiplies by that row's scale
+and shifts to an int16, which is written into the result BRAM. Sixty-four rows later
+the machine sets the done bit. No host involvement during this — it is pure hardware
+for the whole computation.
+
+**5. The host reads the answer back.** The host polls the status address until the
+done bit is set (we saw `status=0x1`), then reads the 64 result addresses. Those are
+the int16 numbers the circuit computed, and they matched the golden reference exactly.
+
+That is the entire mechanism: reprogram the fabric into our circuit, share an address
+map over PCIe, write the inputs into on-chip memory, pulse a start bit, let a 250 MHz
+state machine do the int8 multiply-accumulate in dedicated logic, and read the
+results out of on-chip memory. It is the same shape the full model will use, only
+with a controller sequencing many of these operations and the weights arriving from
+HBM instead of from host writes.
+
+## What is done, and what is not
+
+The cleanest summary is this:
+
+The complete Qwen3.5-0.8B datapath is proven for one decode step in simulation. The
+core int8 matrix-vector datapath is proven on real FPGA silicon. They have not yet
+been joined into a complete on-chip model.
+
+Four substantial pieces remain.
+
+1. An on-chip controller must sequence all 24 layers, select the right mixer, manage
+   recurrent and KV state, and thread the hidden vector through the network.
+2. The model weights must be striped across the HBM channels and streamed through a
+   proper AXI memory path with enough outstanding reads to keep the compute busy.
+3. The embedding lookup and the 248,320-entry tied output head must be integrated.
+4. The larger design must place, route, and close timing at the F2 fixed clock.
+
+This is not a small matter of increasing a loop count. The controller and HBM path
+are new hardware, and the memory system will decide the actual token rate. A larger
+custom-logic build will also expose new timing and interface problems. Based on the
+bring-up so far, we should expect a few.
+
+Still, the project is no longer a slide or a throughput calculation. We have a
+verified software reference, a full-model hardware simulation, a precision format
+that survives all 24 layers, a working F2 build and load flow, measured HBM
+bandwidth, and one central compute engine returning exact results from the chip.
+
+That is a useful place to stand. The arithmetic is no longer the question. The next
+question is whether we can keep it fed, control it correctly, and make the whole
+model live on the FPGA.
+
+## Evidence in the repository
+
+The claims above can be checked directly:
+
+1. `golden/` contains the NumPy and int8 reference implementations.
+2. `rtl/` contains the verified hardware blocks and model simulations.
+3. `docs/full_model.md` describes the full 24-layer run and the Q10 to Q20 precision fix.
+4. `hdk/README.md` documents the build, timing closure, FPGA image, and silicon flow.
+5. `artifacts/fpga_run.txt` is the actual on-chip transcript with the AFI, load result,
+   and 64 out of 64 comparison.
+
+No prompt has run on the FPGA yet. When it does, the proof should look just as plain:
+the image that ran, the input that went in, the token that came out, and the measured
+time on the chip.

@@ -12,6 +12,8 @@ the FPGA build and load path on real silicon, and a measured HBM bandwidth of
 rate measured on the chip, is the next build and has not been done. Every number
 below is labeled with where it came from so nothing reads as more than it is.
 
+**Full write-up (start here):** [`docs/what_we_built.md`](docs/what_we_built.md) — FPGA basics, why this is LPU-like, the whole path to silicon, exactly how the chip runs the math, and the honest gap to the full model.
+
 ## The core idea
 
 Single token decode reads every weight from memory once, does one multiply with
